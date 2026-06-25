@@ -1,11 +1,15 @@
-import os, textwrap, zipfile, json, pathlib
+import os, textwrap, zipfile, pathlib, shutil
 
-base = pathlib.Path("/mnt/data/fabrica_erp_streamlit_v1")
-for sub in ["pages", "database", "services", "components", "utils", "assets"]:
-    (base / sub).mkdir(parents=True, exist_ok=True)
+# Recriar a versão corrigida diretamente
+dst = pathlib.Path("/mnt/data/fabrica_erp_streamlit_cloud_corrigido")
+if dst.exists():
+    shutil.rmtree(dst)
+
+for sub in ["pages", "database", "services", "components", "utils", "assets", ".streamlit"]:
+    (dst / sub).mkdir(parents=True, exist_ok=True)
 
 def w(rel, content):
-    p = base / rel
+    p = dst / rel
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(textwrap.dedent(content).lstrip(), encoding="utf-8")
 
@@ -48,7 +52,15 @@ st.markdown(
     '''
 )
 
-st.info("O menu lateral do Streamlit mostra as páginas do sistema.")
+st.info("Use o menu lateral para navegar entre os módulos do sistema.")
+""")
+
+w(".streamlit/config.toml", """
+[server]
+headless = true
+
+[theme]
+base = "light"
 """)
 
 w("database/db.py", """
@@ -56,7 +68,9 @@ from pathlib import Path
 from sqlalchemy import create_engine, text
 import pandas as pd
 
-DB_PATH = Path(__file__).resolve().parent / "erp_fabrica.db"
+BASE_DIR = Path(__file__).resolve().parent
+DB_PATH = BASE_DIR / "erp_fabrica.db"
+
 ENGINE = create_engine(f"sqlite:///{DB_PATH}", future=True)
 
 def get_engine():
@@ -190,13 +204,6 @@ def to_excel_bytes(df: pd.DataFrame) -> bytes:
     return buffer.getvalue()
 """)
 
-w("components/cards.py", """
-import streamlit as st
-
-def metric_card(label, value, delta=None):
-    st.metric(label=label, value=value, delta=delta)
-""")
-
 w("components/graficos.py", """
 import plotly.express as px
 
@@ -207,11 +214,6 @@ def bar(df, x, y, title, color=None):
 
 def line(df, x, y, title, color=None):
     fig = px.line(df, x=x, y=y, title=title, color=color, markers=True)
-    fig.update_layout(height=380)
-    return fig
-
-def pie(df, names, values, title):
-    fig = px.pie(df, names=names, values=values, title=title)
     fig.update_layout(height=380)
     return fig
 """)
@@ -462,17 +464,14 @@ from services.processos_service import resumo_maquina
 def indicadores_gerais(data_ini=None, data_fim=None):
     params = {}
     where_p = " WHERE 1=1 "
-    where_q = " WHERE 1=1 "
     where_pr = " WHERE 1=1 "
     if data_ini:
         params["data_ini"] = str(data_ini)
         where_p += " AND data >= :data_ini "
-        where_q += " AND data >= :data_ini "
         where_pr += " AND data >= :data_ini "
     if data_fim:
         params["data_fim"] = str(data_fim)
         where_p += " AND data <= :data_fim "
-        where_q += " AND data <= :data_fim "
         where_pr += " AND data <= :data_fim "
 
     meta = scalar(f"SELECT SUM(meta) FROM producao {where_p}", params, 0)
@@ -785,7 +784,7 @@ with tab2:
         familia = c3.text_input("Família")
         unidade = c4.text_input("Unidade", value="UN")
         enviar = st.form_submit_button("Adicionar produto")
-        if enviar:
+        if enviar and codigo and descricao:
             add_produto(codigo, descricao, familia, unidade)
             st.success("Produto adicionado.")
     st.dataframe(get_produtos(), use_container_width=True, hide_index=True)
@@ -797,7 +796,7 @@ with tab3:
         descricao = c1.text_input("Motivo")
         categoria = c2.text_input("Categoria")
         enviar = st.form_submit_button("Adicionar motivo")
-        if enviar:
+        if enviar and descricao:
             add_motivo(descricao, categoria)
             st.success("Motivo adicionado.")
     st.dataframe(get_motivos(), use_container_width=True, hide_index=True)
@@ -830,10 +829,26 @@ if not df.empty:
     st.download_button("Baixar Excel", data=to_excel_bytes(df), file_name=f"{tipo.lower()}.xlsx")
 """)
 
-zip_path = "/mnt/data/fabrica_erp_streamlit_v1.zip"
-with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as z:
-    for p in base.rglob("*"):
-        z.write(p, p.relative_to(base.parent))
+w("README_STREAMLIT_CLOUD.md", """
+# ERP industrial da fábrica — versão corrigida para Streamlit Cloud
 
-print(f"Projeto criado em: {base}")
+## Correções aplicadas
+- `app.py` limpo, sem criação de pastas/arquivos em tempo de execução
+- banco SQLite salvo em `database/erp_fabrica.db`
+- configuração básica em `.streamlit/config.toml`
+
+## Como publicar
+1. Suba a pasta do projeto para um repositório no GitHub
+2. No Streamlit Cloud, escolha esse repositório
+3. Defina o arquivo principal como `app.py`
+4. Faça o deploy
+5. Ao abrir o sistema, vá em **Cadastros** e clique em **Inicializar banco de dados**
+""")
+
+zip_path = "/mnt/data/fabrica_erp_streamlit_cloud_corrigido.zip"
+with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as z:
+    for p in dst.rglob("*"):
+        z.write(p, p.relative_to(dst.parent))
+
+print(f"Projeto corrigido em: {dst}")
 print(f"ZIP: {zip_path}")
