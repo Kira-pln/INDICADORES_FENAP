@@ -1,18 +1,16 @@
-import os, textwrap, zipfile, pathlib, shutil
+import textwrap
+from pathlib import Path
 
-# Recriar a versão corrigida diretamente
-dst = pathlib.Path("/mnt/data/fabrica_erp_streamlit_cloud_corrigido")
-if dst.exists():
-    shutil.rmtree(dst)
+BASE = Path(__file__).resolve().parent
 
-for sub in ["pages", "database", "services", "components", "utils", "assets", ".streamlit"]:
-    (dst / sub).mkdir(parents=True, exist_ok=True)
-
-def w(rel, content):
-    p = dst / rel
+def w(rel_path: str, content: str):
+    p = BASE / rel_path
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(textwrap.dedent(content).lstrip(), encoding="utf-8")
 
+# =========================
+# requirements.txt
+# =========================
 w("requirements.txt", """
 streamlit
 pandas
@@ -21,7 +19,10 @@ sqlalchemy
 openpyxl
 """)
 
-w("app.py", """
+# =========================
+# app.py final do sistema
+# =========================
+w("app_final_streamlit.py", """
 import streamlit as st
 
 st.set_page_config(
@@ -55,6 +56,9 @@ st.markdown(
 st.info("Use o menu lateral para navegar entre os módulos do sistema.")
 """)
 
+# =========================
+# .streamlit/config.toml
+# =========================
 w(".streamlit/config.toml", """
 [server]
 headless = true
@@ -63,6 +67,9 @@ headless = true
 base = "light"
 """)
 
+# =========================
+# database/db.py
+# =========================
 w("database/db.py", """
 from pathlib import Path
 from sqlalchemy import create_engine, text
@@ -96,6 +103,9 @@ def scalar(sql: str, params: dict | None = None, default=0):
     return default if value is None else value
 """)
 
+# =========================
+# database/schema.sql
+# =========================
 w("database/schema.sql", """
 PRAGMA foreign_keys = ON;
 
@@ -168,6 +178,9 @@ CREATE TABLE IF NOT EXISTS processos (
 );
 """)
 
+# =========================
+# database/seed.sql
+# =========================
 w("database/seed.sql", """
 INSERT OR IGNORE INTO maquinas (nome, processo) VALUES
 ('INJ 01','RIM'),
@@ -192,11 +205,14 @@ INSERT OR IGNORE INTO produtos (codigo, descricao, familia, unidade) VALUES
 ('P003','Produto exemplo 3','Linha B','UN');
 """)
 
+# =========================
+# utils/helpers.py
+# =========================
 w("utils/helpers.py", """
 import pandas as pd
+from io import BytesIO
 
 def to_excel_bytes(df: pd.DataFrame) -> bytes:
-    from io import BytesIO
     buffer = BytesIO()
     with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
         df.to_excel(writer, index=False, sheet_name="dados")
@@ -204,6 +220,9 @@ def to_excel_bytes(df: pd.DataFrame) -> bytes:
     return buffer.getvalue()
 """)
 
+# =========================
+# components/graficos.py
+# =========================
 w("components/graficos.py", """
 import plotly.express as px
 
@@ -218,6 +237,9 @@ def line(df, x, y, title, color=None):
     return fig
 """)
 
+# =========================
+# services/cadastros_service.py
+# =========================
 w("services/cadastros_service.py", """
 from database.db import query_df, execute
 
@@ -246,6 +268,9 @@ def add_motivo(descricao, categoria):
     )
 """)
 
+# =========================
+# services/producao_service.py
+# =========================
 w("services/producao_service.py", """
 from database.db import execute, query_df
 
@@ -258,9 +283,16 @@ def inserir_producao(data, maquina_id, produto_id, meta, quantidade, horas_disp,
         (:data, :maquina_id, :produto_id, :meta, :quantidade, :horas_disp, :horas_paradas, :refugo, :retrabalho, :observacao)
         ''',
         {
-            "data": data, "maquina_id": maquina_id, "produto_id": produto_id, "meta": meta,
-            "quantidade": quantidade, "horas_disp": horas_disp, "horas_paradas": horas_paradas,
-            "refugo": refugo, "retrabalho": retrabalho, "observacao": observacao
+            "data": data,
+            "maquina_id": maquina_id,
+            "produto_id": produto_id,
+            "meta": meta,
+            "quantidade": quantidade,
+            "horas_disp": horas_disp,
+            "horas_paradas": horas_paradas,
+            "refugo": refugo,
+            "retrabalho": retrabalho,
+            "observacao": observacao
         }
     )
 
@@ -326,6 +358,9 @@ def resumo_diario(data_ini=None, data_fim=None):
     return query_df(sql, params)
 """)
 
+# =========================
+# services/qualidade_service.py
+# =========================
 w("services/qualidade_service.py", """
 from database.db import execute, query_df
 
@@ -338,8 +373,13 @@ def inserir_qualidade(data, maquina_id, produto_id, tipo_registro, motivo_id, qu
         (:data, :maquina_id, :produto_id, :tipo_registro, :motivo_id, :quantidade, :observacao)
         ''',
         {
-            "data": data, "maquina_id": maquina_id, "produto_id": produto_id, "tipo_registro": tipo_registro,
-            "motivo_id": motivo_id, "quantidade": quantidade, "observacao": observacao
+            "data": data,
+            "maquina_id": maquina_id,
+            "produto_id": produto_id,
+            "tipo_registro": tipo_registro,
+            "motivo_id": motivo_id,
+            "quantidade": quantidade,
+            "observacao": observacao
         }
     )
 
@@ -398,6 +438,9 @@ def resumo_motivos(data_ini=None, data_fim=None):
     return query_df(sql, params)
 """)
 
+# =========================
+# services/processos_service.py
+# =========================
 w("services/processos_service.py", """
 from database.db import execute, query_df
 
@@ -410,8 +453,13 @@ def inserir_processo(data, maquina_id, produto_id, tempo_setup, tempo_injecao, q
         (:data, :maquina_id, :produto_id, :tempo_setup, :tempo_injecao, :quantidade_movimentada, :observacao)
         ''',
         {
-            "data": data, "maquina_id": maquina_id, "produto_id": produto_id, "tempo_setup": tempo_setup,
-            "tempo_injecao": tempo_injecao, "quantidade_movimentada": quantidade_movimentada, "observacao": observacao
+            "data": data,
+            "maquina_id": maquina_id,
+            "produto_id": produto_id,
+            "tempo_setup": tempo_setup,
+            "tempo_injecao": tempo_injecao,
+            "quantidade_movimentada": quantidade_movimentada,
+            "observacao": observacao
         }
     )
 
@@ -455,6 +503,9 @@ def resumo_maquina(data_ini=None, data_fim=None):
     return query_df(sql, params)
 """)
 
+# =========================
+# services/dashboard_service.py
+# =========================
 w("services/dashboard_service.py", """
 from database.db import scalar
 from services.producao_service import resumo_por_maquina, resumo_diario
@@ -465,10 +516,12 @@ def indicadores_gerais(data_ini=None, data_fim=None):
     params = {}
     where_p = " WHERE 1=1 "
     where_pr = " WHERE 1=1 "
+
     if data_ini:
         params["data_ini"] = str(data_ini)
         where_p += " AND data >= :data_ini "
         where_pr += " AND data >= :data_ini "
+
     if data_fim:
         params["data_fim"] = str(data_fim)
         where_p += " AND data <= :data_fim "
@@ -505,6 +558,9 @@ def datasets_dashboard(data_ini=None, data_fim=None):
     }
 """)
 
+# =========================
+# pages/1_Dashboard_geral.py
+# =========================
 w("pages/1_Dashboard_geral.py", """
 import streamlit as st
 from datetime import date, timedelta
@@ -566,6 +622,9 @@ with r3c2:
         st.plotly_chart(bar(df, "maquina", "injecao_media", "Tempo médio de injeção"), use_container_width=True)
 """)
 
+# =========================
+# pages/2_Producao.py
+# =========================
 w("pages/2_Producao.py", """
 import streamlit as st
 from datetime import date, timedelta
@@ -630,6 +689,9 @@ with tab3:
         st.plotly_chart(bar(df, "maquina", "refugo", "Refugo por máquina"), use_container_width=True)
 """)
 
+# =========================
+# pages/3_Qualidade.py
+# =========================
 w("pages/3_Qualidade.py", """
 import streamlit as st
 from datetime import date, timedelta
@@ -694,6 +756,9 @@ with tab3:
         st.plotly_chart(bar(df2, "motivo", "quantidade", "Pareto de motivos"), use_container_width=True)
 """)
 
+# =========================
+# pages/4_Processos.py
+# =========================
 w("pages/4_Processos.py", """
 import streamlit as st
 from datetime import date, timedelta
@@ -753,6 +818,9 @@ with tab3:
         st.plotly_chart(bar(df, "maquina", "qtd_movimentada", "Quantidade movimentada por máquina"), use_container_width=True)
 """)
 
+# =========================
+# pages/5_Cadastros.py
+# =========================
 w("pages/5_Cadastros.py", """
 import streamlit as st
 from pathlib import Path
@@ -802,6 +870,9 @@ with tab3:
     st.dataframe(get_motivos(), use_container_width=True, hide_index=True)
 """)
 
+# =========================
+# pages/6_Relatorios.py
+# =========================
 w("pages/6_Relatorios.py", """
 import streamlit as st
 from datetime import date, timedelta
@@ -829,26 +900,40 @@ if not df.empty:
     st.download_button("Baixar Excel", data=to_excel_bytes(df), file_name=f"{tipo.lower()}.xlsx")
 """)
 
-w("README_STREAMLIT_CLOUD.md", """
-# ERP industrial da fábrica — versão corrigida para Streamlit Cloud
+# =========================
+# README
+# =========================
+w("README.txt", """
+PASSOS FINAIS:
 
-## Correções aplicadas
-- `app.py` limpo, sem criação de pastas/arquivos em tempo de execução
-- banco SQLite salvo em `database/erp_fabrica.db`
-- configuração básica em `.streamlit/config.toml`
+1) Rode este arquivo UMA VEZ:
+   python app.py
 
-## Como publicar
-1. Suba a pasta do projeto para um repositório no GitHub
-2. No Streamlit Cloud, escolha esse repositório
-3. Defina o arquivo principal como `app.py`
-4. Faça o deploy
-5. Ao abrir o sistema, vá em **Cadastros** e clique em **Inicializar banco de dados**
+2) Depois apague este app.py gerador e renomeie:
+   app_final_streamlit.py  ->  app.py
+
+3) Confira se a estrutura ficou assim:
+   - app.py
+   - requirements.txt
+   - .streamlit/config.toml
+   - database/
+   - services/
+   - components/
+   - utils/
+   - pages/
+
+4) Suba tudo para o GitHub
+
+5) No Streamlit Cloud:
+   - Main file path = app.py
+
+6) Ao abrir o sistema:
+   - vá em Cadastros
+   - clique em Inicializar banco de dados
 """)
 
-zip_path = "/mnt/data/fabrica_erp_streamlit_cloud_corrigido.zip"
-with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as z:
-    for p in dst.rglob("*"):
-        z.write(p, p.relative_to(dst.parent))
-
-print(f"Projeto corrigido em: {dst}")
-print(f"ZIP: {zip_path}")
+print("Projeto ERP gerado com sucesso na pasta atual.")
+print("Agora faça o seguinte:")
+print("1) Rode este arquivo localmente")
+print("2) Renomeie app_final_streamlit.py para app.py")
+print("3) Suba a estrutura inteira para o GitHub")
